@@ -22,9 +22,13 @@ function gh_(path,method,payload,raw) {
   return raw?response:(response.getContentText()?JSON.parse(response.getContentText()):{});
 }
 function invalidateFourthDown_(s,message) {
-  s.getRange('F3').setValue('Not calculated');s.getRange('F5:G7').clearContent();s.getRange('F8:F9').clearContent();s.getRange('F2').setValue(message);
+  s.getRange('B22:B23').clearContent();s.getRange('F3').setValue('Not calculated');s.getRange('F5:G7').clearContent();s.getRange('F8:F9').clearContent();s.getRange('F2').setValue(message);
 }
 function onEdit(e) {
+  if(e && e.range.getSheet().getName()==='Calculator' && e.range.getA1Notation()==='B17') {
+    const clockText=e.range.getDisplayValue().trim();
+    if(/^\d{1,2}$/.test(clockText) && Number(clockText)<=15) e.range.setNumberFormat('@').setValue(clockText+':00');
+  }
   if(!e||e.range.getSheet().getName()!=='Calculator')return;
   const r=e.range;
   if(r.getColumn()<=2&&r.getLastColumn()>=2&&r.getRow()<=24&&r.getLastRow()>=4)invalidateFourthDown_(r.getSheet(),'Inputs changed — calculate again');
@@ -40,14 +44,14 @@ function calculateFourthDown() {
     const n=(i,name,min,max)=>{ const x=v[i]; if (x==='' || typeof x!=='number' || !Number.isFinite(x) || x<min || x>max) throw new Error(name+' is invalid.'); return x; };
     const integer=(i,name,min,max)=>{const x=n(i,name,min,max);if (!Number.isInteger(x)) throw new Error(name+' must be a whole number.');return x;};
     const clock=s.getRange('B17').getDisplayValue().trim();
-    const m=clock.match(/^(\d{1,2}):([0-5]\d)$/);
-    if (!m) throw new Error('Clock must be MM:SS, such as 02:09.');
-    const seconds=60*Number(m[1])+Number(m[2]);
+    const m=clock.match(/^(\d{1,2})(?::([0-5]\d))?$/);
+    if (!m) throw new Error('Enter minutes (9) or MM:SS (9:30).');
+    const seconds=60*Number(m[1])+Number(m[2]||0);
     if (seconds<1 || seconds>900) throw new Error('Clock must be between 00:01 and 15:00.');
     if (v[1]===v[2]) throw new Error('Team and opponent must differ.');
     const yard=integer(8,'Yard line',1,50);
     const distance=v[7]==='Own'?100-yard:yard;
-    const payload={mode:v[0],posteam:v[1],opponent:v[2],is_home:v[3]==='Home',
+    const payload={mode:'Real game',posteam:v[1],opponent:v[2],is_home:v[3]==='Home',
       season:integer(4,'Season',2014,2100),type:v[5],qtr:integer(12,'Quarter',1,4),
       quarter_seconds_remaining:seconds,yardline_100:distance,ydstogo:integer(9,'Yards to go',1,distance),
       score_differential:integer(10,'Team score',0,150)-integer(11,'Opponent score',0,150),
@@ -110,7 +114,11 @@ function checkFourthDown() {
     s.getRange('F3').setValue(result.recommendation);
     s.getRange('F8').setValue(result.advantage_pp).setNumberFormat('0.00');
     s.getRange('F9').setValue(new Date()).setNumberFormat('yyyy-mm-dd hh:mm:ss');
-    s.getRange('F2').setValue('Calculated • '+payload.mode);
+    if(result.context) {
+      s.getRange('B22').setValue(-result.context.expected_margin).setNumberFormat('+0.0;-0.0;0.0');
+      s.getRange('B23').setValue(result.context.total_line).setNumberFormat('0.0');
+    }
+    s.getRange('F2').setValue('Calculated');
 
     props.deleteProperty('PENDING_RUN');stopPoll_();
   } catch(err) {
@@ -118,4 +126,3 @@ function checkFourthDown() {
     props.deleteProperty('PENDING_RUN');stopPoll_();
   } finally{lock.releaseLock();}
 }
-
