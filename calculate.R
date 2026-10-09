@@ -34,11 +34,13 @@ calculate <- function(x) {
     season=year, qtr=q, quarter_seconds_remaining=seconds, ydstogo=need,
     yardline_100=yard, score_differential=margin, home_opening_kickoff=home_kick,
     posteam_timeouts_remaining=pt, defteam_timeouts_remaining=dt)
+  context <- NULL
   if (x$mode == "Real game") {
     games <- internal(".games_nfl4th")()
     matches <- games[games$home_team == home & games$away_team == away & games$type == x$type & games$season == year,]
     if (nrow(matches) != 1) stop("No unique scheduled game matches these inputs. Check season, home/away and game type, or use Hypothetical.")
     if (anyNA(matches[,c("spread_line","total_line")])) stop("The scheduled game has no spread or total yet. Use Hypothetical.")
+    context <- list(expected_margin=if(x$is_home) matches$spread_line[1] else -matches$spread_line[1],total_line=matches$total_line[1],roof=matches$roof[1],game_id=matches$game_id[1])
     result <- nfl4th::add_4th_probs(play)
   } else {
     expected <- number(x$expected_margin,"expected margin",-100,100)
@@ -77,10 +79,9 @@ calculate <- function(x) {
   ranking <- order(w, decreasing=TRUE, na.last=NA)
   choices <- lapply(1:3,function(i) list(choice=labels[i],win_probability=w[i],success_probability=success[i]))
   list(recommendation=labels[ranking[1]],advantage_pp=100*(w[ranking[1]]-w[ranking[2]]),
-    choices=choices,model_version=as.character(packageVersion("nfl4th")),mode=x$mode)
+    context=context,choices=choices,model_version=as.character(packageVersion("nfl4th")),mode=x$mode)
 }
 
 input <- Sys.getenv("SITUATION")
 result <- tryCatch(calculate(jsonlite::fromJSON(input)), error=function(e) list(error=conditionMessage(e)))
 jsonlite::write_json(result,"result.json",auto_unbox=TRUE,na="null",null="null",pretty=TRUE)
-
