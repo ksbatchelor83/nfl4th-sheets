@@ -28,13 +28,17 @@ jobs:
             any::tibble
           cache-version: 1
       - name: Calculate
+        id: calculate
         env:
           SITUATION: ${{ inputs.situation }}
-        run: Rscript calculate.R
+        run: |
+          Rscript calculate.R
+          echo "result=$(jq -c . result.json)" >> "$GITHUB_OUTPUT"
+      - name: Result ${{ steps.calculate.outputs.result }}
+        run: echo "Calculation complete"
       - uses: actions/upload-artifact@v4
         with:
           name: result
           path: result.json
           retention-days: 1
           if-no-files-found: error
-
