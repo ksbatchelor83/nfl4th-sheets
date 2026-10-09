@@ -1,0 +1,40 @@
+name: Fourth down calculation
+run-name: Fourth down calculation
+on:
+  workflow_dispatch:
+    inputs:
+      situation:
+        description: Game situation JSON
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  calculate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::nfl4th
+            any::jsonlite
+            any::dplyr
+            any::tibble
+          cache-version: 1
+      - name: Calculate
+        env:
+          SITUATION: ${{ inputs.situation }}
+        run: Rscript calculate.R
+      - uses: actions/upload-artifact@v4
+        with:
+          name: result
+          path: result.json
+          retention-days: 1
+          if-no-files-found: error
+
